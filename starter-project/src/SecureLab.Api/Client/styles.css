@@ -126,6 +126,15 @@ select {
   color: #5c6b80;
 }
 
+.summary-panel {
+  grid-column: 1 / -1;
+}
+
+.summary-list {
+  margin: 1rem 0 0;
+  padding-left: 1.25rem;
+}
+
 @media (max-width: 760px) {
   .page-header,
   .toolbar,

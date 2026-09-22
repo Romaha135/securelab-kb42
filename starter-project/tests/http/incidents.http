@@ -25,6 +25,22 @@ Accept: application/json
 GET {{host}}/api/incidents?status=Unknown
 Accept: application/json
 
-### Lab 1 extension point: expected 501 before student implementation
+### Lab 1 extension point: expected 200 after implementation
+# Контракт: GET без тіла; 200 і JSON-масив елементів { severity, count }.
+# Політика нульових груп: лише наявні групи (порожній результат дає []).
+# Порядок: від критичного до низького (Critical, High, Medium, Low).
+# На baseline seed: High 1, Medium 1, Low 1; Critical відсутній.
 GET {{host}}/api/incidents/severity-summary
+Accept: application/json
+
+### Summary with optional status filter: expected 200, Medium 1
+GET {{host}}/api/incidents/severity-summary?status=Triaged
+Accept: application/json
+
+### Summary for status without incidents: expected 200 and []
+GET {{host}}/api/incidents/severity-summary?status=Resolved
+Accept: application/json
+
+### Summary with status outside allowlist: expected 400 Validation Problem Details
+GET {{host}}/api/incidents/severity-summary?status=Unknown
 Accept: application/json
