@@ -58,4 +58,34 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
                     .ToList()))
             .SingleOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<IncidentSeveritySummaryResponse>> GetSeveritySummaryAsync(
+        IncidentStatus? status,
+        CancellationToken cancellationToken)
+    {
+        var query = dbContext.Incidents.AsNoTracking();
+        if (status is not null)
+        {
+            query = query.Where(incident => incident.Status == status);
+        }
+
+        var groups = await query
+            .GroupBy(incident => incident.Severity)
+            .Select(entry => new { Severity = entry.Key, Count = entry.Count() })
+            .ToListAsync(cancellationToken);
+
+        // Severity зберігається як текст, тому порядок задаємо після матеріалізації:
+        // значення enum зростає від Low до Critical, отже спадання дає порядок критичності.
+        var result = groups
+            .OrderByDescending(entry => entry.Severity)
+            .Select(entry => new IncidentSeveritySummaryResponse(entry.Severity.ToString(), entry.Count))
+            .ToList();
+
+        logger.LogInformation(
+            "Built severity summary for status filter {Status}: {GroupCount} groups",
+            status,
+            result.Count);
+
+        return result;
+    }
 }
