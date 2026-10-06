@@ -1,0 +1,17 @@
+@api = http://localhost:5080
+
+### A. Звичайний пошук (контроль): очікується 200, один запис «Перевірка USB навчальної мережі»
+GET {{api}}/api/incidents/search?q=USB
+
+### B. Значення, якого немає: очікується 200, []
+GET {{api}}/api/incidents/search?q=zz-no-match
+
+### C. Єдиний дозволений контрольний read-only ввід: zz-no-match' OR TRUE -- (з пробілом наприкінці).
+### До виправлення (vulnerable commit) — повертає всі інциденти таблиці.
+### Після виправлення (fixed commit, S-02) — очікується 200, [].
+GET {{api}}/api/incidents/search?q=zz-no-match%27%20OR%20TRUE%20--%20
+
+### D. Легітимний апостроф.
+### До виправлення — 500 Problem Details без внутрішніх деталей (syntax error at or near "Brien").
+### Після виправлення — 200, один запис «O'Brien classroom report».
+GET {{api}}/api/incidents/search?q=O%27Brien
