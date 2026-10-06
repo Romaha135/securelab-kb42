@@ -8,7 +8,7 @@
 - Гілка lab/2-input-sqli: створена від тегу v0.1.0 (commit `922f8b734b030878611a47b11c5ca8337ecf4258`).
 - Release, base_commit та entry_parent із квитанції `.scaffolds/lab-02.json`: release `lab-02-start-v1`, base_commit `922f8b734b030878611a47b11c5ca8337ecf4258`, entry_parent `37ee209389623882c5fbcd0543053e58224742c5` (окремий commit оновлення global.json передував установленню scaffold, тому base_commit і entry_parent різняться — це очікувано).
 - Vulnerable commit: `f7a5b199c54471dd1902c84e46a24514bd94a027` («Validate create-incident contract: required fields, enum, date, cross-field rule, conflict») — контракт створення вже перевірений, пошук ще вразливий.
-- Fixed commit коду: `57258c6358e47acb35dfbd658dcf0ac074ff1541` («Parameterize search query with EF.Functions.ILike and sortBy allowlist; add regression tests»). Фінальний тег v0.2.0 ставиться на commit із цим звітом, після fixed commit: TODO (hash підставити після commit звіту).
+- Fixed commit коду: `95edc1dcb71d88cd532a08b37e6ae67745f387fd` («Parameterize search query with EF.Functions.ILike and sortBy allowlist; add regression tests»). Фінальний тег v0.2.0 ставиться на commit із цим звітом, після fixed commit: TODO (hash підставити після commit звіту).
 - DEL-01: URL приватного remote з доступом або ім'я переданого bundle: TODO.
 
 ## 2. Контракт і CP-01
