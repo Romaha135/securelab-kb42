@@ -10,7 +10,7 @@ public static class Lab02Endpoints
     public static void MapLab02Endpoints(this WebApplication app)
     {
         app.MapGet("/api/incidents/search", async (string? q, string? sortBy, SecureLabDbContext db, CancellationToken ct) =>
-        {
+{
             var order = sortBy switch
             {
                 null or "" or "createdAtUtc" => "created_at_utc DESC",
@@ -19,31 +19,107 @@ public static class Lab02Endpoints
             var sql = "SELECT * FROM incidents WHERE title ILIKE '%" + (q ?? "")
                 + "%' OR description ILIKE '%" + (q ?? "") + "%' ORDER BY " + order + " LIMIT 50";
             var rows = await db.Incidents.FromSqlRaw(sql).AsNoTracking().ToListAsync(ct);
-            return Results.Ok(rows.Select(row => new
-            {
+            return Results.Ok(rows.Select(row => new IncidentSearchResultResponse(
                 row.Id, row.Title, row.Description,
-                Severity = row.Severity.ToString(), Status = row.Status.ToString(), row.CreatedAtUtc
-            }));
+                row.Severity.ToString(), row.Status.ToString(), row.CreatedAtUtc)));
         });
         app.MapPost("/api/incidents", async (CreateIncidentRequest request, SecureLabDbContext db, CancellationToken ct) =>
         {
-            // ЛР 02: доповніть server validation, business rules та response contract.
             var now = DateTimeOffset.UtcNow;
+            var errors = new Dictionary<string, string[]>();
+
+            // 1. Базові перевірки кожного поля на надісланому значенні, до Trim().
+            if (string.IsNullOrWhiteSpace(request.Title))
+                errors["title"] = ["Тема обов'язкова."];
+            else if (request.Title.Length > 160)
+                errors["title"] = ["Тема не довша за 160 символів."];
+
+            if (string.IsNullOrWhiteSpace(request.Description))
+                errors["description"] = ["Опис обов'язковий."];
+            else if (request.Description.Length > 4000)
+                errors["description"] = ["Опис не довший за 4000 символів."];
+
+            // 2. Severity: і перетворення, і належність до оголошених значень.
+            var severityIsValid =
+                Enum.TryParse<IncidentSeverity>(request.Severity, ignoreCase: true, out var severity)
+                && Enum.IsDefined(severity);
+            if (!severityIsValid)
+                errors["severity"] = ["Допустимі значення: Low, Medium, High, Critical."];
+
+            // 3. Дата: обов'язкова і не більш ніж на 5 хвилин у майбутньому.
+            if (request.OccurredAtUtc is null)
+                errors["occurredAtUtc"] = ["Час настання обов'язковий."];
+            else if (request.OccurredAtUtc > now.AddMinutes(5))
+                errors["occurredAtUtc"] = ["Час настання не може випереджати поточний час більш ніж на 5 хвилин."];
+
+            // 4. Нормалізація по одному разу; далі працюємо лише з цими змінними.
+            var title = request.Title?.Trim() ?? "";
+            var description = request.Description?.Trim() ?? "";
+
+            // 5. Cross-field: лише якщо severity вже перевірено і description ще без помилки.
+            if (severityIsValid
+                && (severity == IncidentSeverity.High || severity == IncidentSeverity.Critical)
+                && !errors.ContainsKey("description")
+                && description.Length < 40)
+            {
+                errors["description"] =
+                    ["Для severity High або Critical опис має містити щонайменше 40 символів."];
+            }
+
+            // 6. Усі помилки контракту — одна відповідь 400, до звернення до сховища.
+            if (errors.Count > 0)
+                return Results.ValidationProblem(errors);
+
+            // 7. Предметний конфлікт: запит правильний за формою, але суперечить наявним даним.
+            var hasActiveDuplicate = await db.Incidents.AnyAsync(
+                item => item.Title == title
+                    && (item.Status == IncidentStatus.New
+                        || item.Status == IncidentStatus.Triaged
+                        || item.Status == IncidentStatus.InProgress
+                        || item.Status == IncidentStatus.Resolved),
+                ct);
+            if (hasActiveDuplicate)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "Інцидент із таким заголовком уже активний",
+                    detail: "Інцидент із тим самим заголовком уже перебуває в одному з активних станів.");
+            }
+
+            // 8. Entity: server-managed поля встановлює лише сервер.
+            var occurredAtUtc = request.OccurredAtUtc!.Value.ToUniversalTime();
             var incident = new Incident
             {
-                Id = Guid.NewGuid(), OwnerUserId = DbSeeder.AliceId,
-                Title = request.Title ?? "", Description = request.Description ?? "",
-                Severity = Enum.TryParse<IncidentSeverity>(request.Severity, true, out var severity)
-                    ? severity : IncidentSeverity.Low,
-                Status = IncidentStatus.New, OccurredAtUtc = request.OccurredAtUtc ?? now,
-                CreatedAtUtc = now, UpdatedAtUtc = now
+                Id = Guid.NewGuid(),
+                OwnerUserId = DbSeeder.AliceId,
+                Title = title,
+                Description = description,
+                Severity = severity,
+                Status = IncidentStatus.New,
+                OccurredAtUtc = occurredAtUtc,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
             };
             db.Incidents.Add(incident);
             await db.SaveChangesAsync(ct);
-            return Results.Created($"/api/incidents/{incident.Id}", new { incident.Id, incident.Title });
+
+            // 9. Response DTO: лише поля зовнішнього контракту.
+            var response = new CreatedIncidentResponse(
+                incident.Id, incident.Title, incident.Severity.ToString(),
+                incident.Status.ToString(), incident.OccurredAtUtc, incident.CreatedAtUtc);
+            return Results.Created($"/api/incidents/{incident.Id}", response);
         });
     }
+
+    
 }
 
 public sealed record CreateIncidentRequest(
     string? Title, string? Description, string? Severity, DateTimeOffset? OccurredAtUtc);
+
+public sealed record CreatedIncidentResponse(
+    Guid Id, string Title, string Severity, string Status,
+    DateTimeOffset OccurredAtUtc, DateTimeOffset CreatedAtUtc);
+
+public sealed record IncidentSearchResultResponse(
+    Guid Id, string Title, string Description, string Severity, string Status, DateTimeOffset CreatedAtUtc);
