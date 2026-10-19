@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
@@ -53,8 +54,17 @@ public static class Lab02Endpoints
                 .ToListAsync(ct);
             return Results.Ok(items);
         });
-        app.MapPost("/api/incidents", async (CreateIncidentRequest request, SecureLabDbContext db, CancellationToken ct) =>
+        app.MapPost("/api/incidents", async (
+            CreateIncidentRequest request, HttpContext httpContext, SecureLabDbContext db, CancellationToken ct) =>
         {
+            // Verified principal: ЛР 3 замінює сталий навчальний контекст ЛР 2.
+            // Анонімний запит сюди не доходить — .RequireAuthorization() повертає 401 раніше.
+            var ownerId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(ownerId, out var verifiedOwnerId))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
+            }
+
             var now = DateTimeOffset.UtcNow;
             var errors = new Dictionary<string, string[]>();
 
@@ -121,7 +131,7 @@ public static class Lab02Endpoints
             var incident = new Incident
             {
                 Id = Guid.NewGuid(),
-                OwnerUserId = DbSeeder.AliceId,
+                OwnerUserId = verifiedOwnerId,
                 Title = title,
                 Description = description,
                 Severity = severity,
@@ -138,7 +148,7 @@ public static class Lab02Endpoints
                 incident.Id, incident.Title, incident.Severity.ToString(),
                 incident.Status.ToString(), incident.OccurredAtUtc, incident.CreatedAtUtc);
             return Results.Created($"/api/incidents/{incident.Id}", response);
-        });
+        }).RequireAuthorization();
     }
 
     // Екранує спецсимволи мови шаблонів ILIKE (%, _) та сам escape character (\),
