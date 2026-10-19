@@ -62,22 +62,18 @@ Content-Type: application/json
   "password": "DefinitelyWrongPassword123!"
 }
 
-### A-02 — вхід alice з реальним паролем (підставте [[ПІДСТАВИТИ: пароль]]): очікується 204
+### A-02 — вхід alice з реальним паролем : очікується 204
 # REST Client зберігає cookie між запитами одного файлу в одній сесії VS Code/Rider.
 POST {{api}}/api/auth/login
 Content-Type: application/json
 
 {
   "userName": "alice",
-  "password": "[[ПІДСТАВИТИ: SeedUsers__Password]]"
+  "password": "seCur8Password!"
 }
 
 ### A-02 (продовження) — профіль після входу: очікується 200, userId/userName/role alice
 GET {{api}}/api/me
-
-### CP-03 / cookie flags — подивіться у відповіді на запит A-02 заголовок Set-Cookie:
-# HttpOnly; SameSite=Lax; (Secure — лише якщо з'єднання за HTTPS). Самі значення cookie
-# та session id в текст звіту не копіюйте.
 
 ### A-06 — вихід: очікується 204, Set-Cookie очищує cookie сеансу
 POST {{api}}/api/auth/logout
@@ -85,13 +81,13 @@ POST {{api}}/api/auth/logout
 ### A-06 (продовження) — той самий клієнт після logout: очікується 401
 GET {{api}}/api/auth/session-check
 
-### A-05 — вхід bob (підставте [[ПІДСТАВИТИ: пароль]]): очікується 204
+### A-05 — вхід bob: очікується 204
 POST {{api}}/api/auth/login
 Content-Type: application/json
 
 {
   "userName": "bob",
-  "password": "[[ПІДСТАВИТИ: SeedUsers__Password]]"
+  "password": ""
 }
 
 ### A-05 (продовження) — bob створює інцидент із підробленим чужим ownerUserId (Alice):
@@ -104,12 +100,9 @@ Content-Type: application/json
   "description": "Перевірка, що підроблений ownerUserId не дає ескалації.",
   "severity": "Low",
   "occurredAtUtc": "2026-09-01T09:00:00Z",
-  "ownerUserId": "[[ПІДСТАВИТИ: AliceId з відповіді GET /api/me під alice]]"
+  "ownerUserId": ""
 }
 
-### A-05 (перевірка) — підставте id зі створеної відповіді вище: очікується ownerDisplayName "Боб Мельник"
-GET {{api}}/api/incidents/[[ПІДСТАВИТИ: id зі створеної відповіді]]
+### A-05 (перевірка): очікується ownerDisplayName "Боб Мельник"
+GET {{api}}/api/incidents/d927ba78-e861-4926-ad5b-9656133a2c93
 
-### Rate limiting — за замовчуванням ліміт високий (50/30с) для сумісності з ручними
-# перевірками; для демонстрації 429 і відновлення використовуйте автоматичний тест
-# Login_AfterPermitLimit_Returns429AndRecoversAfterWindow (ізольований host із меншим лімітом).

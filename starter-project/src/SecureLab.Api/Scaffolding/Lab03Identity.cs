@@ -48,13 +48,7 @@ public static class Lab03Identity
                 var permitLimit = configuration.GetValue("RateLimiting:LoginPermitLimit", 50);
                 var windowSeconds = configuration.GetValue("RateLimiting:LoginWindowSeconds", 30);
 
-                // Ключ групи — IP-адреса клієнта. Це об'єднує користувачів за спільним NAT
-                // (слабший бік порівняно з ключем за ім'ям), але не дає стороннім навмисно
-                // заблокувати вхід у чужий обліковий запис підбором невірного пароля —
-                // обґрунтування цього вибору наведено в звіті. У тестовому host
-                // RemoteIpAddress завжди null, тому всі тестові клієнти одного host
-                // потрапляють у спільну групу "unknown" — це відоме обмеження локального
-                // стенду, а не промислового middleware.
+                
                 var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
                 {

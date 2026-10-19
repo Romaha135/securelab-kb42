@@ -5,7 +5,6 @@ using SecureLab.Api.Data.Entities;
 
 namespace SecureLab.Api.Scaffolding;
 
-// Навчальний старт ЛР 02. Запускати лише з локальними штучними даними.
 public static class Lab02Endpoints
 {
     public static void MapLab02Endpoints(this WebApplication app)
