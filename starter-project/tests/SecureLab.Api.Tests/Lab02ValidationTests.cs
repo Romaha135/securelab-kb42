@@ -11,7 +11,17 @@ namespace SecureLab.Api.Tests;
 public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
     : IClassFixture<SecureLabApiFactory>
 {
-    private readonly HttpClient _client = factory.CreateClient();
+    // Пошук лишається анонімним endpoint ЛР 2 — для нього окремий клієнт без cookie.
+    private readonly HttpClient _anonymousClient = factory.CreateClient();
+
+    private static string RequireSeedPassword() =>
+        Environment.GetEnvironmentVariable("SeedUsers__Password")
+            ?? throw new InvalidOperationException("Set local SeedUsers__Password outside Git.");
+
+    // ЛР 3, етап 5: POST /api/incidents захищено, тому перевірки контракту ЛР 2
+    // виконуються через автентифікований cookie client, а не анонімний.
+    private Task<HttpClient> CreateAuthenticatedClientAsync() =>
+        factory.LoginAsync("alice", RequireSeedPassword());
 
     private async Task DeleteByTitleAsync(string title)
     {
@@ -24,7 +34,8 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
     [Fact]
     public async Task Create_WithEmptyDto_Returns400WithAllFieldKeys()
     {
-        using var response = await _client.PostAsJsonAsync("/api/incidents", new { });
+        using var client = await CreateAuthenticatedClientAsync();
+        using var response = await client.PostAsJsonAsync("/api/incidents", new { });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -51,7 +62,8 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
             occurredAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10)
         };
 
-        using var response = await _client.PostAsJsonAsync("/api/incidents", body);
+        using var client = await CreateAuthenticatedClientAsync();
+        using var response = await client.PostAsJsonAsync("/api/incidents", body);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var json = await response.Content.ReadAsStringAsync();
@@ -72,7 +84,8 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
             occurredAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10)
         };
 
-        using var response = await _client.PostAsJsonAsync("/api/incidents", body);
+        using var client = await CreateAuthenticatedClientAsync();
+        using var response = await client.PostAsJsonAsync("/api/incidents", body);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var json = await response.Content.ReadAsStringAsync();
@@ -95,7 +108,8 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
 
         try
         {
-            using var response = await _client.PostAsJsonAsync("/api/incidents", body);
+            using var client = await CreateAuthenticatedClientAsync();
+            using var response = await client.PostAsJsonAsync("/api/incidents", body);
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         }
         finally
@@ -119,10 +133,11 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
 
         try
         {
-            using var first = await _client.PostAsJsonAsync("/api/incidents", body);
+            using var client = await CreateAuthenticatedClientAsync();
+            using var first = await client.PostAsJsonAsync("/api/incidents", body);
             Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-            using var second = await _client.PostAsJsonAsync("/api/incidents", body);
+            using var second = await client.PostAsJsonAsync("/api/incidents", body);
             Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
 
             var json = await second.Content.ReadAsStringAsync();
@@ -136,7 +151,8 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
         }
     }
 
-    // CP-01 / A-02: зайві server-managed поля в тілі запиту клієнт передати не може.
+    // CP-01 (ЛР 2) / A-05 (ЛР 3): зайві server-managed поля в тілі запиту клієнт передати не може,
+    // включно з ownerUserId — його ігнорує сам тип запиту (у ньому такого поля немає).
     [Fact]
     public async Task Create_WithOverpostedServerManagedFields_IgnoresClientValues()
     {
@@ -155,7 +171,8 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
 
         try
         {
-            using var response = await _client.PostAsJsonAsync("/api/incidents", body);
+            using var client = await CreateAuthenticatedClientAsync();
+            using var response = await client.PostAsJsonAsync("/api/incidents", body);
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
             var json = await response.Content.ReadAsStringAsync();
@@ -171,10 +188,11 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
     }
 
     // T-05: невідоме значення sortBy не доходить до SQL і дає 400 з ключем sortBy.
+    // Пошук лишається анонімним, тому запит виконується без логіну.
     [Fact]
     public async Task Search_WithUnknownSortBy_Returns400WithSortByKey()
     {
-        using var response = await _client.GetAsync("/api/incidents/search?sortBy=price");
+        using var response = await _anonymousClient.GetAsync("/api/incidents/search?sortBy=price");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var json = await response.Content.ReadAsStringAsync();
@@ -186,7 +204,7 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
     [Fact]
     public async Task Search_WithLegitimateApostrophe_ReturnsExpectedRecordWithout500()
     {
-        using var response = await _client.GetAsync(
+        using var response = await _anonymousClient.GetAsync(
             "/api/incidents/search?q=" + Uri.EscapeDataString("O'Brien"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -201,7 +219,7 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
     [Fact]
     public async Task Search_WithSqlInjectionPayload_ReturnsEmptySet()
     {
-        using var response = await _client.GetAsync(
+        using var response = await _anonymousClient.GetAsync(
             "/api/incidents/search?q=" + Uri.EscapeDataString("zz-no-match' OR TRUE -- "));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -215,7 +233,7 @@ public sealed class Lab02ValidationTests(SecureLabApiFactory factory)
     [Fact]
     public async Task Search_WithUsbQuery_ReturnsSingleSeededRecord()
     {
-        using var response = await _client.GetAsync("/api/incidents/search?q=USB");
+        using var response = await _anonymousClient.GetAsync("/api/incidents/search?q=USB");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var items = await response.Content
