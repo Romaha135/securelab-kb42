@@ -1,0 +1,115 @@
+@api = http://localhost:5080
+
+### T-01 — коректна реєстрація: очікується 201, DTO без password/passwordHash
+POST {{api}}/api/auth/register
+Content-Type: application/json
+
+{
+  "userName": "checks-student",
+  "email": "checks-student@example.test",
+  "displayName": "Чекліст Студент",
+  "password": "Str0ng-Study-Pass!"
+}
+
+### T-02 — слабкий пароль: очікується 400 з ключем password
+POST {{api}}/api/auth/register
+Content-Type: application/json
+
+{
+  "userName": "checks-weak",
+  "email": "checks-weak@example.test",
+  "displayName": "Слабкий Пароль",
+  "password": "abc"
+}
+
+### T-02 (duplicate) — повторна реєстрація того самого userName: очікується 409, не 500
+POST {{api}}/api/auth/register
+Content-Type: application/json
+
+{
+  "userName": "checks-student",
+  "email": "checks-student-2@example.test",
+  "displayName": "Дублікат",
+  "password": "Str0ng-Study-Pass!"
+}
+
+### A-01 — анонімний створювальний запит: очікується 401, без Location (не redirect)
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "Anonymous probe",
+  "description": "Перевірка анонімного доступу.",
+  "severity": "Low",
+  "occurredAtUtc": "2026-09-01T09:00:00Z"
+}
+
+### A-07a — вхід неіснуючого користувача: очікується 401 (підставте власний пароль нижче не потрібно)
+POST {{api}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userName": "no-such-user",
+  "password": "SomeRandomPassword123!"
+}
+
+### A-07b — вхід alice з неправильним паролем: очікується той самий 401, що й A-07a
+POST {{api}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userName": "alice",
+  "password": "DefinitelyWrongPassword123!"
+}
+
+### A-02 — вхід alice з реальним паролем (підставте [[ПІДСТАВИТИ: пароль]]): очікується 204
+# REST Client зберігає cookie між запитами одного файлу в одній сесії VS Code/Rider.
+POST {{api}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userName": "alice",
+  "password": "[[ПІДСТАВИТИ: SeedUsers__Password]]"
+}
+
+### A-02 (продовження) — профіль після входу: очікується 200, userId/userName/role alice
+GET {{api}}/api/me
+
+### CP-03 / cookie flags — подивіться у відповіді на запит A-02 заголовок Set-Cookie:
+# HttpOnly; SameSite=Lax; (Secure — лише якщо з'єднання за HTTPS). Самі значення cookie
+# та session id в текст звіту не копіюйте.
+
+### A-06 — вихід: очікується 204, Set-Cookie очищує cookie сеансу
+POST {{api}}/api/auth/logout
+
+### A-06 (продовження) — той самий клієнт після logout: очікується 401
+GET {{api}}/api/auth/session-check
+
+### A-05 — вхід bob (підставте [[ПІДСТАВИТИ: пароль]]): очікується 204
+POST {{api}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userName": "bob",
+  "password": "[[ПІДСТАВИТИ: SeedUsers__Password]]"
+}
+
+### A-05 (продовження) — bob створює інцидент із підробленим чужим ownerUserId (Alice):
+# очікується 201; власник у відповіді GET нижче має лишитись Бобом, а не Алісою.
+POST {{api}}/api/incidents
+Content-Type: application/json
+
+{
+  "title": "A-05 forged owner check",
+  "description": "Перевірка, що підроблений ownerUserId не дає ескалації.",
+  "severity": "Low",
+  "occurredAtUtc": "2026-09-01T09:00:00Z",
+  "ownerUserId": "[[ПІДСТАВИТИ: AliceId з відповіді GET /api/me під alice]]"
+}
+
+### A-05 (перевірка) — підставте id зі створеної відповіді вище: очікується ownerDisplayName "Боб Мельник"
+GET {{api}}/api/incidents/[[ПІДСТАВИТИ: id зі створеної відповіді]]
+
+### Rate limiting — за замовчуванням ліміт високий (50/30с) для сумісності з ручними
+# перевірками; для демонстрації 429 і відновлення використовуйте автоматичний тест
+# Login_AfterPermitLimit_Returns429AndRecoversAfterWindow (ізольований host із меншим лімітом).
