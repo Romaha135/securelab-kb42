@@ -6,15 +6,23 @@ using SecureLab.Api.Presentation.Contracts;
 
 namespace SecureLab.Api.Tests;
 
+// ЛР 4: список і деталі тепер потребують входу, тому перші три тести
+// використовують клієнта, що увійшов (login). Решта тестів — як були.
 public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     : IClassFixture<SecureLabApiFactory>
 {
     private readonly HttpClient _client = factory.CreateClient();
 
+    private static string RequireSeedPassword() =>
+        Environment.GetEnvironmentVariable("SeedUsers__Password")
+            ?? throw new InvalidOperationException("Set local SeedUsers__Password outside Git.");
+
     [Fact]
-    public async Task GetList_ReturnsSeededIncidents()
+    public async Task GetList_ForAnalyst_ReturnsSeededIncidents()
     {
-        var incidents = await _client.GetFromJsonAsync<List<IncidentListItemResponse>>(
+        // Morgan (Analyst) бачить усі інциденти.
+        using var morgan = await factory.LoginAsync("morgan", RequireSeedPassword());
+        var incidents = await morgan.GetFromJsonAsync<List<IncidentListItemResponse>>(
             "/api/incidents");
 
         Assert.NotNull(incidents);
@@ -25,7 +33,8 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     [Fact]
     public async Task GetDetails_ForUnknownId_ReturnsProblemDetails404()
     {
-        using var response = await _client.GetAsync($"/api/incidents/{Guid.NewGuid()}");
+        using var alice = await factory.LoginAsync("alice", RequireSeedPassword());
+        using var response = await alice.GetAsync($"/api/incidents/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -34,7 +43,8 @@ public sealed class IncidentEndpointTests(SecureLabApiFactory factory)
     [Fact]
     public async Task GetDetails_DoesNotExposeInternalOwnerFields()
     {
-        using var response = await _client.GetAsync(
+        using var alice = await factory.LoginAsync("alice", RequireSeedPassword());
+        using var response = await alice.GetAsync(
             $"/api/incidents/{DbSeeder.AliceIncidentId}");
         var json = await response.Content.ReadAsStringAsync();
         using var document = JsonDocument.Parse(json);
