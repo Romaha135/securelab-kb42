@@ -1,0 +1,72 @@
+# Для VS Code потрібне розширення "REST Client" (humao.rest-client).
+# Пароль береться зі змінної середовища SeedUsers__Password (у файл його НЕ пишемо).
+# Натискайте "Send Request" над кожним блоком по черзі. Cookie зберігає розширення.
+
+@host = http://localhost:5080
+@aliceId = 20000000-0000-0000-0000-000000000001
+@bobId = 20000000-0000-0000-0000-000000000002
+@aliceNewId = 20000000-0000-0000-0000-000000000003
+@internalCommentId = 30000000-0000-0000-0000-000000000003
+@morganCommentOnBobId = 30000000-0000-0000-0000-000000000002
+
+### 1. Alice: вхід
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "alice", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### 2. Alice: власні деталі (очікуємо 200)
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+### 3. Alice: деталі інциденту Bob (до виправлення — 200 = вразливість; після — 403)
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+### 4. Alice: чужий update (до виправлення — 204 = вразливість; після — 403)
+PUT {{host}}/api/incidents/{{bobId}}
+Content-Type: application/json
+
+{ "title": "ЗМІНЕНО Alice", "description": "Alice змінила чужий інцидент." }
+
+### 5. Alice: список (після виправлення — лише власні)
+GET {{host}}/api/incidents
+Accept: application/json
+
+### 6. Alice: triage (після виправлення — 403)
+POST {{host}}/api/incidents/{{aliceNewId}}/triage
+
+### 7. Alice: коментар Morgan до інциденту Bob (після виправлення — 403)
+GET {{host}}/api/incident-comments/{{morganCommentOnBobId}}
+Accept: application/json
+
+### 8. Alice: internal-коментар (після виправлення — 403)
+GET {{host}}/api/incident-comments/{{internalCommentId}}
+Accept: application/json
+
+### 9. Bob: вхід (змінює поточного користувача)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "bob", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### 10. Bob: власні деталі (200)
+GET {{host}}/api/incidents/{{bobId}}
+Accept: application/json
+
+### 11. Morgan: вхід
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "morgan", "password": "{{$processEnv SeedUsers__Password}}" }
+
+### 12. Morgan: читає інцидент Alice (200)
+GET {{host}}/api/incidents/{{aliceId}}
+Accept: application/json
+
+### 13. Morgan: triage нового інциденту Alice (200; це змінює дані — потім зробіть reset)
+POST {{host}}/api/incidents/{{aliceNewId}}/triage
+
+### 14. Morgan: internal-коментар (200)
+GET {{host}}/api/incident-comments/{{internalCommentId}}
+Accept: application/json

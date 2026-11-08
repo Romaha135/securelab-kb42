@@ -7,13 +7,22 @@ namespace SecureLab.Api.Application.Incidents;
 
 public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<IncidentQueries> logger)
 {
+    // Список. Якщо seeAll = false (Reporter), у запит додається умова "лише мої".
+    // Тобто чужі рядки навіть не завантажуються з бази.
     public async Task<IReadOnlyList<IncidentListItemResponse>> GetListAsync(
         IncidentStatus? status,
+        Guid currentUserId,
+        bool seeAll,
         CancellationToken cancellationToken)
     {
         logger.LogInformation("Loading incidents with status filter {Status}", status);
 
         var query = dbContext.Incidents.AsNoTracking();
+        if (!seeAll)
+        {
+            query = query.Where(incident => incident.OwnerUserId == currentUserId);
+        }
+
         if (status is not null)
         {
             query = query.Where(incident => incident.Status == status);
@@ -31,7 +40,26 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
             .ToListAsync(cancellationToken);
     }
 
-    public Task<IncidentDetailsResponse?> GetDetailsAsync(Guid id, CancellationToken cancellationToken)
+    // Завантажує сам інцидент (з OwnerUserId). Назовні цей об'єкт НЕ віддається —
+    // він потрібен лише серверу, щоб ухвалити рішення "можна / не можна".
+    public Task<Incident?> FindForAccessAsync(Guid id, CancellationToken cancellationToken) =>
+        dbContext.Incidents
+            .AsNoTracking()
+            .SingleOrDefaultAsync(incident => incident.Id == id, cancellationToken);
+
+    // Коментар разом із батьківським інцидентом (потрібен для перевірки права).
+    public Task<IncidentComment?> FindCommentAsync(Guid id, CancellationToken cancellationToken) =>
+        dbContext.IncidentComments
+            .AsNoTracking()
+            .Include(comment => comment.Incident)
+            .Include(comment => comment.Author)
+            .SingleOrDefaultAsync(comment => comment.Id == id, cancellationToken);
+
+    // Деталі. includeInternal = true лише для Analyst; для Reporter внутрішні коментарі відсікаються.
+    public Task<IncidentDetailsResponse?> GetDetailsAsync(
+        Guid id,
+        bool includeInternal,
+        CancellationToken cancellationToken)
     {
         logger.LogInformation("Loading incident {IncidentId}", id);
 
@@ -48,13 +76,14 @@ public sealed class IncidentQueries(SecureLabDbContext dbContext, ILogger<Incide
                 incident.CreatedAtUtc,
                 incident.Owner.DisplayName,
                 incident.Comments
-                    .Where(comment => !comment.IsInternal)
+                    .Where(comment => includeInternal || !comment.IsInternal)
                     .OrderBy(comment => comment.CreatedAtUtc)
                     .Select(comment => new IncidentCommentResponse(
                         comment.Id,
                         comment.Author.DisplayName,
                         comment.Text,
-                        comment.CreatedAtUtc))
+                        comment.CreatedAtUtc,
+                        comment.IsInternal))
                     .ToList()))
             .SingleOrDefaultAsync(cancellationToken);
     }

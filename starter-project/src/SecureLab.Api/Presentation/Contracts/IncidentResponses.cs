@@ -19,11 +19,14 @@ public sealed record IncidentDetailsResponse(
     string OwnerDisplayName,
     IReadOnlyList<IncidentCommentResponse> Comments);
 
+// Додано поле IsInternal (останнє), щоб Analyst бачив, що коментар внутрішній.
+// Для Reporter внутрішні коментарі в список взагалі не потрапляють.
 public sealed record IncidentCommentResponse(
     Guid Id,
     string AuthorDisplayName,
     string Text,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    bool IsInternal);
 
 public sealed record IncidentSeveritySummaryResponse(
     string Severity,
