@@ -4,7 +4,9 @@
 
 ## Стенд і Git-стан (Для всіх)
 
-ОС, browser/version, API/probe origins: … Release/base_commit/entry_parent з receipt: … (entry_parent — commit, від якого встановлено scaffold; збігається з base_commit, якщо після v0.4.0 не було commit політики SDK). Vulnerable/fixed hashes, v0.5.0, main і спосіб передавання: …
+ОС, browser/version, API/probe origins: Windows 11 Pro, Chrome 157.0.8103.3; API http://localhost:5080, allowed probe http://localhost:4173, disallowed probe http://localhost:4174.
+Release/base_commit/entry_parent з receipt: release lab-05-start-v1 (inherits v0.4.0); base_commit = entry_parent = e984f4514d15a5be201f8bc45d9b3d4bd190d2ef.
+Vulnerable hash: 8c5bcda. Seed, fixed, v0.5.0, main і спосіб передавання: .
 
 Механізм сеансу (Application → Storage → Cookies → http://localhost:5080): назва cookie, Domain, Path, HttpOnly, SameSite, Secure — без Value: …
 
