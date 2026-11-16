@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+fieldset { margin-bottom: 1.5rem; }
+label { display: block; margin: 0.4rem 0; }
+input, select, textarea { width: 100%; box-sizing: border-box; }
+#session-state { font-weight: bold; }
+#profile, #create-result { white-space: pre-wrap; }
