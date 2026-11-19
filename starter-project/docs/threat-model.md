@@ -32,7 +32,34 @@ anonymous; Reporter (alice, bob); Analyst (morgan); Administrator (admin); ло�
 
 ## 5. Entry points
 
-ЗАПОВНИТИ з таблиці периметра (етап 2, п. 3): метод + маршрут для кожного змінювального маршруту, login, register, search, браузерні форми, завантаження конфігурації, restore пакетів, журнали.
+### 5.1 Змінювальні маршрути (за `git grep`, стан v0.5.0)
+
+| Метод і маршрут | Що змінює | Authn | Antiforgery до виправлення |
+|---|---|---|---|
+| `POST /api/incidents` | створює інцидент | cookie-сесія | ні |
+| `PUT /api/incidents/{id}` | змінює заголовок і опис | cookie-сесія | ні |
+| `DELETE /api/incidents/{id}` | видаляє інцидент | cookie-сесія | ні |
+| `POST /api/incidents/{id}/triage` | перехід `New` → `Triaged` | cookie-сесія | ні |
+| `POST /api/auth/logout` | завершує сеанс | cookie-сесія | ні |
+| `POST /api/auth/login` | створює сеанс | анонімний | н/д |
+| `POST /api/auth/register` | створює обліковий запис | анонімний | н/д |
+
+Решта маршрутів лише читає дані. Інших `MapPost`, `MapPut`, `MapPatch`, `MapDelete` у `src/SecureLab.Api` немає.
+
+### 5.2 Інші точки входу
+
+| Точка входу | Опис |
+|---|---|
+| `GET /api/incidents/search` | пошук; приймає текст від користувача; після Lab 6 обмежений rate limiting (політика `search`) |
+| `GET /api/incidents`, `GET /api/incidents/{id}` | читання списку та картки; параметр `status` проходить валідацію |
+| `POST /api/auth/login` | єдина точка входу для облікових даних; обмежена rate limiting (політика входу) |
+| Браузерні форми | `browser-lab.html`, `auth-lab.html`: введення guid, назви та опису інциденту, облікових даних |
+| `GET /api/csrf-token` | видає antiforgery-токен лише автентифікованому користувачу (додається в Lab 6) |
+| Статичні сторінки клієнта | `GET /` та файли `Client/*`; також fallback для невідомих шляхів (`/scalar/v1` повертає сторінку клієнта) |
+| Завантаження конфігурації | `appsettings.json`, змінні середовища (`ConnectionStrings__SecureLab`, `SeedUsers__Password`, `RateLimiting__*`), локальні `.env` та `appsettings.Local.json` (поза Git) |
+| Restore пакетів | NuGet restore під час збирання; перевіряється аудитом залежностей (`dotnet package list --vulnerable --include-transitive`) |
+| Журнали | вхідні дані користувача (ім'я користувача, ідентифікатори) потрапляють у журнал; очищаються через `LogText.Safe` |
+| Аргументи запуску | `--reset-database`; дозволений лише в Development, інакше `InvalidOperationException` |
 
 ## 6. Межі довіри та схема
 
@@ -66,11 +93,10 @@ environment configuration  ──► API startup
 
 validation (ЛР 2), authentication і rate limit login (ЛР 3), authorization IncidentAccess (ЛР 4), safe DOM renderText + CORS + CSP + заголовки (ЛР 5), antiforgery + search limiter + заголовки на error-path (ЛР 6).
 
-## 9. Виключення (чого не перевіряли)
+## 9. Виключення (чого не перевіряв)
 
 - немає production host, TLS-термінації, HSTS на реальному домені;
 - не виконувався зовнішній penetration test;
 - history Git, stash, інші клони, зовнішній CI не скануються (ЗАПОВНИТИ, якщо межі інші);
-- `GET /api/incidents/search` і `/severity-summary` анонімні за контрактом ЛР 1–2: це прийняте обмеження, питання до викладача (див. Residual risks);
 - login/register без antiforgery: токен видається лише після входу (login CSRF — залишковий ризик);
 - Redis і advanced variant не входять до рівня «Добре».
