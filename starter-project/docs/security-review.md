@@ -4,7 +4,7 @@
 
 ## 1. Executive summary
 
-Перевірено стан v0.5.0 (`bd636b1`) і виправлення в commit H1 `7e6a20c` (гілка `lab/6-hardening-review`) у локальному запуску на http://localhost:5080. У межах: клієнт, API, PostgreSQL, конфігурація, журнали, залежності. Поза межами: див. threat-model.md. Зафіксовано 2 findings, виправлено 2 (F-01 CSRF на cookie-змінювальних маршрутах, F-02 відсутні заголовки безпеки на відповіді 500). Додано rate limiting для пошуку, аудит успішного переходу статусу й нормалізацію логу. Regression на гілці після останньої зміни коду: PASS, 47 з 47, 19.11.2026; прогін на merge commit: ЗАПОВНИТИ (PASS/FAIL, дата) після злиття. Головні залишкові ризики: login CSRF, токен доступний XSS на власному origin, анонімний пошук за контрактом ЛР 1–2, відсутній доказ TLS/HSTS, in-memory limiter.
+Перевірено стан v0.5.0 (`bd636b1`) і виправлення в commit H1 `7e6a20c` (гілка `lab/6-hardening-review`) у локальному запуску на http://localhost:5080. У межах: клієнт, API, PostgreSQL, конфігурація, журнали, залежності. Поза межами: див. threat-model.md. Зафіксовано 2 findings, виправлено 2 (F-01 CSRF на cookie-змінювальних маршрутах, F-02 відсутні заголовки безпеки на відповіді 500). Додано rate limiting для пошуку, аудит успішного переходу статусу й нормалізацію логу. Regression на гілці після останньої зміни коду: PASS, 47 з 47, 19.11.2026; на merge commit M `cbe7903`: PASS, 47 з 47, 19.11.2026. Головні залишкові ризики: login CSRF, токен доступний XSS на власному origin, анонімний пошук за контрактом ЛР 1–2, відсутній доказ TLS/HSTS, in-memory limiter.
 
 ## 2. Scope та exclusions
 
@@ -50,7 +50,7 @@ docs/findings/F-01-csrf-cookie-mutations.md, docs/findings/F-02-security-headers
 | rate limit login | abuse flow limited | quota/window | вище квоти: 429 | відновлення | `Login_AfterPermitLimit_Returns429AndRecoversAfterWindow` | pass |
 | rate limit search | abuse flow limited | quota 3 за 10 с (дослід), default 20/30 с | 4-й запит: 429 | інший partition, відновлення | `Search_RateLimit_PartitionsAreIndependent_429_AndRecovers` + ручний дослід | pass |
 
-Final run: `dotnet test tests/SecureLab.Api.Tests/SecureLab.Api.Tests.csproj --configuration Release` після `--reset-database`, 19.11.2026: total 47, failed 0, succeeded 47 (на гілці, H1 `7e6a20c`). Прогін на merge commit: ЗАПОВНИТИ (N з N, дата, hash M).
+Final run: `dotnet test tests/SecureLab.Api.Tests/SecureLab.Api.Tests.csproj --configuration Release` після `--reset-database`, 19.11.2026: total 47, failed 0, succeeded 47 (на гілці, H1 `7e6a20c`). Прогін на merge commit M `cbe7903` у `main` (після `--reset-database`, Release): total 47, failed 0, succeeded 47, 19.11.2026.
 
 ## 8. Hardening controls
 
@@ -143,4 +143,4 @@ SDK 10.0.401; команди `dotnet restore`, `dotnet package list --vulnerable
 | EV-07 | залежності | Рис. 16 | немає відомих advisory |
 | EV-08 | аудит triage, чистий журнал | Рис. 17, 18 | denied/allowed записи; 0/0/0 |
 | EV-09 | повна регресія | Рис. 19 | 47 з 47 |
-| EV-10 | Git-стани і тег | Рис. 20 | ЗАПОВНИТИ (hash M, тег `v1.0.0`) |
+| EV-10 | Git-стани і тег | Рис. 20 | S/review-start `bd636b1` (v0.5.0), skeleton `fd896e3`, H1 `7e6a20c`, H2 `5749b07` + `eddbe16`, merge commit M `cbe790356214369498a19b3170e652ffda334ae6` (`cbe7903`), анотований тег `v1.0.0` на M |
