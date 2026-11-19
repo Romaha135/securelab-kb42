@@ -4,6 +4,7 @@ using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Data;
 using SecureLab.Api.Data.Entities;
 using SecureLab.Api.Presentation.Contracts;
+using SecureLab.Api.Security;
 
 namespace SecureLab.Api.Presentation.Endpoints;
 
@@ -44,20 +45,23 @@ public static class IncidentEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<AntiforgeryFilter>();
 
         group.MapDelete("/{id:guid}", DeleteAsync)
             .WithName("DeleteIncident")
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<AntiforgeryFilter>();
 
         group.MapPost("/{id:guid}/triage", TriageAsync)
             .WithName("TriageIncident")
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .AddEndpointFilter<AntiforgeryFilter>();
 
         // severity-summary та search — рівень "Відмінно" (A-11), тут не змінюємо.
         group.MapGet("/severity-summary", GetSeveritySummaryAsync)
@@ -261,6 +265,19 @@ public static class IncidentEndpoints
             CreatedAtUtc = now
         });
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Аудит успішного переходу: той самий набір полів, що й для відмови вище.
+        logger.LogInformation(
+            "incident.status.changed subject={SubjectId} action={Action} resource={ResourceId} "
+            + "result={Result} from={OldStatus} to={NewStatus} occurredAtUtc={OccurredAtUtc:O} traceId={TraceId}",
+            userId.Value,
+            "incident.triage",
+            incident.Id,
+            "allowed",
+            oldStatus,
+            incident.Status,
+            now,
+            Activity.Current?.Id ?? httpContext.TraceIdentifier);
 
         return Results.Ok(new { id = incident.Id, status = incident.Status.ToString() });
     }

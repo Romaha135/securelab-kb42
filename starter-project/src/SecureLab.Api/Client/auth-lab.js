@@ -74,6 +74,8 @@ document.querySelector("#login").addEventListener("submit", async event => {
   loginResult.textContent = `Login: ${response.status}`;
   await refreshSessionState();
   if (response.status === 204) {
+    // Новий сеанс: токен попереднього користувача забуваємо.
+    window.SecureLabCsrf.reset();
     await loadProfile();
   }
 });
@@ -95,7 +97,12 @@ async function loadProfile() {
 document.querySelector("#me").addEventListener("click", loadProfile);
 
 document.querySelector("#logout").addEventListener("click", async () => {
-  await apiFetch("/api/auth/logout", { method: "POST" });
+  try {
+    await window.SecureLabCsrf.mutate("/api/auth/logout", { method: "POST" });
+  } catch {
+    // Немає активного сеансу (токен не видано): нічого виходити.
+  }
+  window.SecureLabCsrf.reset();
   profileElement.textContent = "";
   createResult.textContent = "";
   loginResult.textContent = "";
@@ -116,11 +123,19 @@ document.querySelector("#create-incident").addEventListener("submit", async even
     severity: formData.get("severity"),
     occurredAtUtc
   };
-  const response = await apiFetch("/api/incidents", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+  let response;
+  try {
+    response = await window.SecureLabCsrf.mutate("/api/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    createResult.textContent = error.status === 401
+      ? "Спершу увійдіть."
+      : "Не вдалося одержати токен безпеки.";
+    return;
+  }
   if (response.status === 201) {
     const created = await response.json();
     createResult.textContent = `Створено: ${created.id}`;

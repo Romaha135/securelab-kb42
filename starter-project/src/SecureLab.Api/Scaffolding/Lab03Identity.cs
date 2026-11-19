@@ -2,7 +2,9 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
+using SecureLab.Api.Application.Incidents;
 using SecureLab.Api.Data;
+using SecureLab.Api.Security;
 using SecureLab.Api.Data.Entities;
 
 namespace SecureLab.Api.Scaffolding;
@@ -50,6 +52,27 @@ public static class Lab03Identity
 
                 
                 var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = permitLimit,
+                    Window = TimeSpan.FromSeconds(windowSeconds),
+                    QueueLimit = 0
+                });
+            });
+
+            // ЛР 6: ліміт для GET /api/incidents/search. Partition: id користувача з cookie,
+            // якщо він ввійшов (перевірена identity), інакше IP-адреса. Довільний header
+            // від клієнта ключем не є.
+            options.AddPolicy("search", httpContext =>
+            {
+                var configuration = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+                var permitLimit = configuration.GetValue("RateLimiting:SearchPermitLimit", 20);
+                var windowSeconds = configuration.GetValue("RateLimiting:SearchWindowSeconds", 30);
+
+                var userId = IncidentAccess.GetUserId(httpContext.User);
+                var partitionKey = userId.HasValue
+                    ? $"user:{userId.Value}"
+                    : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
                 return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = permitLimit,
@@ -156,7 +179,7 @@ public static class Lab03Identity
             // не потрапляють.
             logger.LogInformation(
                 "Authentication event {EventType}: user {UserName}, result {Result}, trace {TraceId}",
-                "login", input.UserName, result.Succeeded ? "success" : "failure", httpContext.TraceIdentifier);
+                "login", LogText.Safe(input.UserName), result.Succeeded ? "success" : "failure", httpContext.TraceIdentifier);
 
             // Єдина 401-відповідь для неіснуючого користувача й неправильного пароля —
             // захист від account enumeration (A-07).
@@ -167,7 +190,7 @@ public static class Lab03Identity
         {
             await signIn.SignOutAsync();
             return Results.NoContent();
-        });
+        }).RequireAuthorization().AddEndpointFilter<AntiforgeryFilter>();
 
         app.MapGet("/api/me", GetCurrentUser).RequireAuthorization();
 
