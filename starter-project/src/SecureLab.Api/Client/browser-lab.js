@@ -24,9 +24,18 @@ async function load() {
 document.querySelector("#load").addEventListener("click", load);
 document.querySelector("#edit").addEventListener("submit", async event => {
   event.preventDefault();
-  const response = await fetch("/api/incidents", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: event.currentTarget.elements.title.value, description: event.currentTarget.elements.description.value,
-      severity: "Low", occurredAtUtc: new Date().toISOString() }) });
+  const payload = JSON.stringify({ title: event.currentTarget.elements.title.value,
+    description: event.currentTarget.elements.description.value,
+    severity: "Low", occurredAtUtc: new Date().toISOString() });
+  let response;
+  try {
+    // ЛР 6: змінювальний запит іде через спільний helper, який додає antiforgery header.
+    response = await window.SecureLabCsrf.mutate("/api/incidents", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+  } catch (error) {
+    status.textContent = `POST: ${error.status ?? "помилка токена"}`;
+    return;
+  }
   status.textContent = `POST: ${response.status}`;
   if (response.ok) {
     const created = await response.json();
