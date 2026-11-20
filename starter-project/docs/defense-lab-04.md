@@ -37,7 +37,7 @@ I1 = `20000000-0000-0000-0000-000000000001` — інцидент Alice (seed).
 Мутант (Update дістає правило Read):
  
 ```csharp
-IncidentOperation.Update => isOwner || isAnalyst,   // МУТАНТ, не комітити
+IncidentOperation.Update => isOwner || isAnalyst,   // МУТАНТ
 ```
  
 Письмова перевірка (ручне трасування, код не змінювався):
@@ -61,9 +61,9 @@ IncidentOperation.Update => isOwner || isAnalyst,   // МУТАНТ, не ком
  
 | # | Що | Прогноз (до запуску) | Факт | Джерело |
 |---|---|---|---|---|
-| 1 | Morgan GET I1 | 200 | _заповнити_ | HTTP (тест) |
-| 2 | Morgan PUT I1 `WEB04-forbidden` | 403 (K) | _заповнити_ | HTTP (тест) |
-| 3 | Alice GET I1 після | 200, title/owner/status = початкові | _заповнити_ | HTTP (тест) + БД (тест) + SQL |
+| 1 | Morgan GET I1 | 200 | 200 | HTTP (тест) |
+| 2 | Morgan PUT I1 `WEB04-forbidden` | 403 (K) | 403 | HTTP (тест) |
+| 3 | Alice GET I1 після | 200, title/owner/status = початкові | без змін | HTTP (тест) + БД (тест) + SQL |
  
 SQL-спостереження (БД напряму, до і після):
  
